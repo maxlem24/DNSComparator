@@ -11,24 +11,29 @@ wget --quiet "https://urlhaus.abuse.ch/downloads/hostfile/" -O - | grep -i -v -e
 
 # Merge and unification
 cat lists/*.txt | sort | uniq > lists/compromised.txt
-split -l 2500 -d -a 2 lists/compromised.txt lists/sublist_test
 echo "list merged and sorted"
 
 # Create Thread to check if domains still valid
-NUM_THREADS=$(($(wc -l lists/compromised.txt | sed 's/ .*//')/2500))
+NUM_THREADS=30
+split -n l/$NUM_THREADS -d -a 2 lists/compromised.txt lists/sublist_test
+
 
 PIDS=()
 
+# Function to check which hosts are still existing
 function check_valid {
 	local id=$1
 	while read host; do
-		ip_address=$(dig @8.8.8.8 +short $host | head -n1)
-		if [[ -n $ip_address ]]; then
+		ip_address=$(dig @8.8.8.8 $host +short | head -n1 )
+		if [ -n "$ip_address" ] && ["$ip_address" != "0.0.0.0"] && ["$ip_address" != "127.0.0.1"]  ; then
 			echo $host >> "lists/sublist_valid${id}"
 		fi
 	done < "lists/sublist_test${id}"
 }
+
+
 ten=10
+
 for ((i=0;i<NUM_THREADS;i++)); do
 	if [ "$i" -lt "$ten" ];then
 		check_valid "0${i}" &
@@ -43,9 +48,9 @@ for pid in "${PIDS[@]}"; do
 	wait $pid
 done
 
-cat lists/sublist_valid* | sort > lists/valid.txt
+cat lists/sublist_valid* | sort > valid.txt
 sleep 1
 rm lists/sublist_*
 
 echo "Completed"
-echo "Length of the final list: $(wc -l lists/valid.txt | sed 's/ .*//')"
+echo "Length of the final list: $(wc -l valid.txt | sed 's/ .*//')"

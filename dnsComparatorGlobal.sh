@@ -1,21 +1,29 @@
 #!/bin/bash
 
 dnsList=$1
-FILE="/lists/valid.txt"
-if [ -f $FILE ];then
+list="valid.txt"
+if [ -f $list ];then
 	currentDate=$(date +%s)
-	lastModif=$(date -r $FILE +%s)
-	if [ "$(($currentDate-$lastModif))" -gt "${86400}"];then
-		/bin/bash initFile.sh
+	lastModif=$(date -r $list +%s)
+	day=86400
+	if [ "$(($currentDate-$lastModif))" -gt "${day}" ];then
+		/bin/bash initList.sh
 	fi
 else
-	/bin/bash initFile.sh
+	/bin/bash initList.sh
+fi
+
+result="results.txt"
+if [ -f $result ];then
+	rm $result
 fi
 
 while read dns; do
-	address=$(sed 's/ .*//' dns)
-	name=$(sed 's/^.* //' dns)
-	/bin/bash dnsChecker $address $name
-done < dnsList
+	if [ -n dns ]; then
+		address=$(echo $dns | grep -Eo "^[^ ]*" )
+		name=$(echo $dns | grep -Eo "[A-Z][0-9A-Za-Z ]+[0-9A-Za-Z]" )
+		/bin/bash dnsChecker.sh "$address" "$name"
+	fi
+done < "${dnsList}"
 
 echo "Comparaison finished, check the result in the 'results.txt' file"
