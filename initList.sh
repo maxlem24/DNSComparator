@@ -11,20 +11,19 @@ wget --quiet "https://urlhaus.abuse.ch/downloads/hostfile/" -O - | grep -i -v -e
 
 # Merge and unification
 cat lists/*.txt | sort | uniq > lists/compromised.txt
-split -l 5000 -d -a 2 lists/compromised.txt lists/sublist_test
-
+split -l 2500 -d -a 2 lists/compromised.txt lists/sublist_test
+echo "list merged and sorted"
 
 # Create Thread to check if domains still valid
-NUM_THREADS=$(($(wc -l lists/compromised.txt | sed 's/ .*//')/5000))
+NUM_THREADS=$(($(wc -l lists/compromised.txt | sed 's/ .*//')/2500))
 
 PIDS=()
 
 function check_valid {
 	local id=$1
-	local cpt=0
 	while read host; do
 		ip_address=$(dig @8.8.8.8 +short $host | head -n1)
-		if [[ -z $ip_address ]]; then
+		if [[ -n $ip_address ]]; then
 			echo $host >> "lists/sublist_valid${id}"
 		fi
 	done < "lists/sublist_test${id}"
@@ -44,4 +43,9 @@ for pid in "${PIDS[@]}"; do
 	wait $pid
 done
 
+cat lists/sublist_valid* | sort > lists/valid.txt
+sleep 1
+rm lists/sublist_*
+
 echo "Completed"
+echo "Length of the final list: $(wc -l lists/valid.txt | sed 's/ .*//')"
