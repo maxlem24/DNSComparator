@@ -1,5 +1,6 @@
 #!/bin/bash
 
+mkdir lists 2>>/dev/null
 # CLean Previous lists
 rm lists/*
 

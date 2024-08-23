@@ -36,4 +36,4 @@ for pid in "${PIDS[@]}"; do
 	wait $pid
 done
 
-echo "Comparaison finished, check the result in the 'results.txt' file"
+echo "Comparison finished, check the result in the 'results.txt' file"

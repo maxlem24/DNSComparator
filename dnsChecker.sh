@@ -6,7 +6,7 @@ dnsOptions=$3
 
 echo "Starting analyse ${dnsName} on ${dnsServer}"
 
-mkdir "lists/${dnsName}"
+mkdir -p "lists/${dnsName}"
 
 function check_blocked {
 	local id=$1
