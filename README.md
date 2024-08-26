@@ -1,6 +1,8 @@
 # Content :
 Scripts to test how DNS respond to threats domains
 
+A list of IP addresses corresponding to block pages is also provided. You can change it with your own block pages IP addresses.
+
 # Use :
 The DNS to test should be in a `.txt` file over the format :
 

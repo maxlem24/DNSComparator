@@ -8,12 +8,23 @@ echo "Starting analyse ${dnsName} on ${dnsServer}"
 
 mkdir -p "lists/${dnsName}"
 
+function is_a_blockpage {
+	local ip=$1
+	while read exception; do
+		if [ "$ip" == "$exception" ]; then
+			return 0
+		fi
+	done <"blockpages.txt"
+	return 1
+}
+
+
 function check_blocked {
 	local id=$1
 	local thread_blocked=0
 	while read host; do
 		ip_address=$(dig @$dnsServer $host $dnsOptions +short | grep -E "([0-9]{1,3}.){3}[0-9]{1,3}" | tail -n1)
-		if [[ -z "$ip_address" ]] || [ "$ip_address" == "0.0.0.0" ] || [ "$ip_address" == "127.0.0.1" ] || [ "$ip_address" == "52.6.32.13" ] || [ "$ip_address" == "34.236.196.185" ] || [ "$ip_address" == "199.247.2.157" ] || [ "$ip_address" == "95.179.166.46" ] || [ "$ip_address" == "156.154.113.16" ]; then
+		if [[ -z "$ip_address" ]] || is_a_blockpage "$ip_address" ;then
 			let thread_blocked++
 		fi
 	done < "lists/${dnsName}/sub_valid${id}"
