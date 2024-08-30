@@ -2,7 +2,7 @@
 
 mkdir lists 2>>/dev/null
 # CLean Previous lists
-rm lists/*
+rm -f lists/*
 
 # Get lists
 wget --quiet "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" -O - | grep -i -v -e '^#' > lists/zonefiles_compromised.txt
@@ -29,18 +29,16 @@ PIDS=()
 function check_valid {
 	local id=$1
 	while read host; do
-		ip_address=$(dig @8.8.8.8 $host +short | grep -E "([0-9]{1,3}.){3}[0-9]{1,3}" | head -n1 )
-		if [ -n "$ip_address" ] && [ "$ip_address" != "0.0.0.0" ] && [ "$ip_address" != "127.0.0.1" ]  ; then
+		ip_address=$(dig @8.8.8.8 $host +short | grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" | head -n1 )
+		if [ -n "$ip_address" ] && [ "$ip_address" != "0.0.0.0" ] && [ "$ip_address" != "127.0.0.1" ] && [ "$ip_address" != "8.8.8.8" ] ; then
 			echo $host >> "lists/sublist_valid${id}"
 		fi
 	done < "lists/sublist_test${id}"
 }
 
 
-ten=10
-
 for ((i=0;i<NUM_THREADS;i++)); do
-	if [ "$i" -lt "$ten" ];then
+	if [ "$i" -lt "10" ];then
 		check_valid "0${i}" &
 		PIDS+=($!)
 	else
@@ -55,7 +53,7 @@ done
 
 cat lists/sublist_valid* | sort > valid.txt
 sleep 1
-rm lists/sublist_*
+rm  -f lists/sublist_*
 
 echo "Completed"
 echo "Length of the final list: $(wc -l valid.txt | sed 's/ .*//')"

@@ -1,3 +1,4 @@
 lists/
+verbose/
 *.txt
 !blockpages.txt
