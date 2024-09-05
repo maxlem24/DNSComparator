@@ -2,3 +2,4 @@ lists/
 verbose/
 *.txt
 !blockpages.txt
+api/node_modules/

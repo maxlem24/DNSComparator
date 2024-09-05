@@ -35,7 +35,7 @@ init_list() {
 	cat lists/*.txt | sort | uniq > lists/compromised.txt
 
 	local length=$(wc -l lists/compromised.txt | sed 's/ .*//')
-	local INIT_THREADS=30
+	local INIT_THREADS=50
 
 	split -l $(($length/$INIT_THREADS+1)) -d -a 2 lists/compromised.txt lists/sublist_test
 	local INIT_PIDS=()
@@ -203,7 +203,7 @@ if [ -f $domains ];then
 		init_list
 	fi
 else
-	printf "The list of domains is empty, generation of a new list"
+	printf "The list of domains is empty, generation of a new list\n"
 	init_list
 fi
 
@@ -214,7 +214,7 @@ if [ -f $result ];then
 fi
 
 VALID_LENGTH=$(wc -l "$domains" | sed 's/ .*//')
-DNS_THREADS=20
+DNS_THREADS=30
 
 split -l $(($VALID_LENGTH/$DNS_THREADS+1)) -d -a 2 "$domains" "lists/sub_valid"
 
