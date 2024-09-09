@@ -2,7 +2,6 @@
 
 dnsList=''
 blockpagesList=''
-verbose=false
 domains='valid.txt'
 timecheck=true
 
@@ -15,22 +14,41 @@ check_valid() {
 	local id=$1
 	while read host; do
 		local data=$(dig @8.8.8.8 $host +short +time=3)
-                local ip_address=$(echo "${data}" | grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" | tail -n1)
-		if [ -n "$ip_address" ] && [ "$ip_address" != "0.0.0.0" ] && [ "$ip_address" != "127.0.0.1" ] && [ "$ip_address" != "8.8.8.8" ] ; then
+                local ip_address=$(echo "${data}" \
+			| grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" \
+			| tail -n1)
+
+		if [ -n "$ip_address" ] \
+		&& [ "$ip_address" != "0.0.0.0" ] \
+		&& [ "$ip_address" != "127.0.0.1" ] \
+		&& [ "$ip_address" != "8.8.8.8" ] ; then
 			echo $host >> "lists/sublist_valid${id}"
 		fi
+
 	done < "lists/sublist_test${id}"
 }
 
 # Init lists
+
 init_list() {
 
 	rm -f lists/*
 
-	wget --quiet "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" -O - | grep -i -v -e '^#' > lists/zonefiles_compromised.txt
-	wget --quiet "https://hole.cert.pl/domains/v2/domains.txt" -O lists/certpl_compromised.txt
-	wget --quiet "https://v.firebog.net/hosts/Prigent-Malware.txt" -O - | grep -i -v -e '^#|^$' > lists/firebog_compromised.txt
-	wget --quiet "https://urlhaus.abuse.ch/downloads/hostfile/" -O - | grep -i -v -e '^#' | sed "s/127.0.0.1\t//"> lists/abusesh_compromised.txt
+	curl -s "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" \
+	| grep -i -v -e '^#' \
+	> lists/zonefiles_compromised.txt
+
+	curl -s "https://hole.cert.pl/domains/v2/domains.txt" \
+	-o lists/certpl_compromised.txt
+
+	curl -s "https://v.firebog.net/hosts/Prigent-Malware.txt" \
+	| grep -i -v -e '^#|^$' \
+	> lists/firebog_compromised.txt
+
+	curl -s "https://urlhaus.abuse.ch/downloads/hostfile/" \
+	| grep -i -v -e '^#' \
+	| sed "s/127.0.0.1\t//" \
+	> lists/abusesh_compromised.txt
 
 	cat lists/*.txt | sort | uniq > lists/compromised.txt
 
@@ -61,20 +79,24 @@ init_list() {
 }
 
 # Ignore blockpages
+
 blockpages=()
 
 is_a_blockpage() {
 	local ip=$1
+
 	for exception in "${blockpages[@]}"; do
 		if [ "$ip" == "$exception" ]; then
 			return 0
 		fi
 	done
+
 	return 1
 }
 
-# Check domains with 1 DNS
-check_blocked() {
+# Check sublist
+
+thread_check_blocked() {
 	local dnsServer=$1
 	local dnsName=$2
 	local dnsOptions=$3
@@ -86,27 +108,30 @@ check_blocked() {
 
 	local thread_blocked=0
 
-	if $verbose ; then
-        	touch "lists/${dnsName}/timed_out_${id}.txt"
-        	touch "lists/${dnsName}/not_blocked_${id}.txt"
-	fi
+	touch "lists/${dnsName}/timed_out_${id}.txt"
+        touch "lists/${dnsName}/not_blocked_${id}.txt"
 
 	while read host; do
 		local data=$(dig @$dnsServer $host $dnsOptions +short)
-		local ip_address=$(echo "${data}" | grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" | tail -n1)
+		local ip_address=$(echo "${data}" \
+			| grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" \
+			| tail -n1)
 		if [[ -z "$ip_address" ]] || is_a_blockpage "$ip_address" ;then
 			let thread_blocked++
-		elif $verbose ;then
-			if [ "$ip_address" == "$dnsServer" ]; then
-				echo "${host}" >> "lists/${dnsName}/timed_out_${id}.txt"
-			else
-				echo "${host}" >> "lists/${dnsName}/not_blocked_${id}.txt"
-			fi
+
+		elif [ "$ip_address" == "$dnsServer" ]; then
+			echo "${host}" >> "lists/${dnsName}/timed_out_${id}.txt"
+
+		else
+			echo "${ip_address} ${host}" >> "lists/${dnsName}/not_blocked_${id}.txt"
+
 		fi
 	done < "lists/sub_valid${id}"
 
 	echo $thread_blocked >> "lists/${dnsName}/sub_valid_total"
 }
+
+# Check list with 1 DNS server
 
 checker() {
 	local dnsServer=$1
@@ -117,6 +142,7 @@ checker() {
 	touch "lists/${dnsName}/sub_valid_total"
 
 	local dnsOptions=''
+
 	if [ -n "$endpoint" ]; then
                 dnsOptions="+https=${endpoint}"
         fi
@@ -125,12 +151,15 @@ checker() {
 	local STARTTIME=$(date +%s)
 
 	for ((i=0;i<DNS_THREADS;i++)); do
+
 		if [ "$i" -lt "10" ];then
-			check_blocked "$dnsServer" "$dnsName" "$dnsOptions" "0${i}" &
+			thread_check_blocked "$dnsServer" "$dnsName" "$dnsOptions" "0${i}" &
 			CHECK_PIDS+=($!)
+
 		else
-			check_blocked "$dnsServer" "$dnsName" "$dnsOptions" "${i}" &
+			thread_check_blocked "$dnsServer" "$dnsName" "$dnsOptions" "${i}" &
                 	CHECK_PIDS+=($!)
+
 		fi
 	done
 
@@ -138,13 +167,12 @@ checker() {
 		wait $pid
 	done
 
-	if $verbose ; then
-		cat "lists/${dnsName}"/timed_out_*.txt > "verbose/${dnsName}_timed_out.txt"
-		cat "lists/${dnsName}"/not_blocked_*.txt > "verbose/${dnsName}_not_blocked.txt"
-	fi
+	cat "lists/${dnsName}"/timed_out_*.txt | sort > "verbose/${dnsName}_timed_out.txt"
+	cat "lists/${dnsName}"/not_blocked_*.txt | sort > "verbose/${dnsName}_not_blocked.txt"
 
 	local ENDTIME=$(date +%s)
 	local sum_blocked=0
+
 	while read value; do
 		sum_blocked=$(($sum_blocked+$value))
 	done < "lists/${dnsName}/sub_valid_total"
@@ -157,23 +185,49 @@ checker() {
 	echo "${dnsName} finished in $(($ENDTIME - $STARTTIME)) secs"
 }
 
+# Send email
+
+send_email(){
+	set -a
+	source .env
+	set +a
+
+	zip results -r -q results.txt verbose
+	subject="Test results"
+	file="results.zip"
+
+	curl -s --url 'smtps://smtp.gmail.com:465' --ssl-reqd \
+    	--mail-from "$SENDER_MAIL" \
+    	--mail-rcpt "$RECEIVER_MAIL" \
+    	--user "$SENDER_MAIL:$SENDER_PASSWD" \
+    	-H "From: ${SENDER_MAIL}" \
+   	-H "To: ${RECEIVER_MAIL}" \
+    	-H "Subject : ${subject}" \
+    	-F '=(;type=multipart/mixed' \
+    	-F '="Here are the results";type=text/plain' \
+    	-F "file=@$file;type=application/zip;encoder=base64" \
+    	-F "=)"
+
+	rm $file
+}
 
 # Manual
+
 print_usage() {
 	printf "Usage: \n"
 	printf "\t-l filename : Set the list of DNS to test (required) \n"
 	printf "\t-b filename : Set the list of the blockpages IP adresses (required) \n"
 	printf "\t-d filename : Set the list of domains to test. Default: valid.txt \n"
-	printf "\t-v : Set verbose on \n"
 	printf "\t-f : Force the use of the list of domains if it is been updated since more than 24 hours \n"
 	printf "\t-h : Display the use of the command\n"
 }
 
-while getopts 'l:b:vd:fh' flag; do
+# Handle Args
+
+while getopts 'l:b:d:fh' flag; do
 	case "${flag}" in
 		l) 	dnsList="${OPTARG}";;
 		b) 	blockpagesList="${OPTARG}";;
-		v) 	verbose=true ;;
 		d)	domains="${OPTARG}";;
 		f)	timecheck=false ;;
 		h)	print_usage
@@ -183,24 +237,32 @@ while getopts 'l:b:vd:fh' flag; do
 	esac
 done
 
-if [ -z "$dnsList" ] || [ ! -f "$dnsList" ] || [ -z "$blockpagesList" ] || [ ! -f "$blockpagesList" ];then
+if [ -z "$dnsList" ] || [ ! -f "$dnsList" ] \
+|| [ -z "$blockpagesList" ] || [ ! -f "$blockpagesList" ];then
 	print_usage
 	exit 1
 fi
 
 # Init the blockpage list
+
 while read blockpage; do
         blockpages+=($blockpage)
 done <"$blockpagesList"
 
 # Verify the list of domains to check
+
 if [ -f $domains ];then
+
 	currentDate=$(date +%s)
 	lastModif=$(date -r $domains +%s)
 	day=86400
-	if $timecheck && [ "$(($currentDate-$lastModif))" -gt "${day}" ];then
+
+	if $timecheck \
+	&& [ "$(($currentDate-$lastModif))" -gt "${day}" ];then
+
 		printf "Update of the domains list\n"
 		init_list
+
 	fi
 else
 	printf "The list of domains is empty, generation of a new list\n"
@@ -208,6 +270,7 @@ else
 fi
 
 # Init result.txt file
+
 result="results.txt"
 if [ -f $result ];then
 	rm $result
@@ -219,15 +282,15 @@ DNS_THREADS=30
 split -l $(($VALID_LENGTH/$DNS_THREADS+1)) -d -a 2 "$domains" "lists/sub_valid"
 
 # Clean verbose folder
-if $verbose ;then
-        mkdir verbose 2>>/dev/null
-        rm -f verbose/*
-fi
+
+mkdir verbose 2>>/dev/null
+rm -f verbose/*
 
 while read dns; do
 	if [ -z "$dns" ]; then
 		continue
 	fi
+
 	address=$(echo $dns | grep -Eo "^[^ ]*" )
 	name=$(echo $dns | grep -Eo "[A-Z][0-9A-Za-Z ]+[0-9A-Za-Z]" )
 	options=$(echo $dns | grep -Eo "\/.*$")
@@ -238,16 +301,16 @@ while read dns; do
 
        	checker  "$address"  "$name" "$options" &
 	PIDS+=($!)
+
 done < "${dnsList}"
 
 for pid in "${PIDS[@]}"; do
 	wait $pid
 done
 
+send_email
+
 rm  -f lists/sub*
 
-if $verbose ; then
-        echo "Verbose results in 'verbose' directory"
-fi
-
 echo "Comparison finished, check the result in the 'results.txt' file"
+echo "The detailled results are in the 'verbose' folder"

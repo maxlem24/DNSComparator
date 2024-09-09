@@ -1,18 +1,21 @@
-# Content :
-Scripts to test how DNS respond to threats domains
+# Goal :
 
-A list of IP addresses corresponding to block pages is also provided. You can change it with your own block pages IP addresses.
+The goal of this project is to test the blockrate of the DNS solution you use in your company
 
-# Use :
-The DNS to test should be in a `.txt` file over the format :
+# Usage :
 
-`<DNS Server Address>` `<DNS Name>` `<options>`
+-l filename : Set the list of DNS to test **required**. The format is `ServerAddress Name Options`. 
+Options are used for DNS-Over-Https, with `ServerAddress` the domain and `Options` the path, beginning with `/`
 
-To see which options are available, you can check the man page of `dig`
+-b filename : Set the list of the blockpages IP adresses **required**
+You will find the blockpages addresses in the settings of your DNS Provider. You can also run a first time the app, and check in the verbose folder which address at more frequent that the others.
 
-To launch the test; you should be in the root folder of this repository, and execute the script `dnsComparatorglobal.sh` with the name of your `.txt` file as argument
+-d filename : Set the list of domains to test. *Default: valid.txt* 
+
+-f : Force the use of the list of domains if it is been updated since more than 24 hours
+
+-h : Display the use of the command
 
 # Results :
 
-The script will make the tests requests for you, and the results will be on a `results.txt` file.
-You will see the number of blocked requests and the ratio
+In the file `results.txt`, you will find the blockrate of each solution tested. A `verbose` folder is also create, with the list of timed-out and non-blocked address for each solution.
