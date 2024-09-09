@@ -3,3 +3,4 @@ verbose/
 *.txt
 !blockpages.txt
 api/node_modules/
+mail/.env
