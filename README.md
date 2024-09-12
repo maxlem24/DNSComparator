@@ -16,6 +16,8 @@ You will find the blockpages addresses in the settings of your DNS Provider. You
 
 -h : Display the use of the command
 
+-y : Accept that the data collected will be sent to Kappa Data
+
 # Results :
 
 In the file `results.txt`, you will find the blockrate of each solution tested. A `verbose` folder is also create, with the list of timed-out and non-blocked address for each solution.

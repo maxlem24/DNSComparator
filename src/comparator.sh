@@ -4,6 +4,7 @@ dnsList=''
 blockpagesList=''
 domains='valid.txt'
 timecheck=true
+accept_mail=false
 
 VALID_LENGTH=0
 
@@ -220,11 +221,17 @@ print_usage() {
 	printf "\t-d filename : Set the list of domains to test. Default: valid.txt \n"
 	printf "\t-f : Force the use of the list of domains if it is been updated since more than 24 hours \n"
 	printf "\t-h : Display the use of the command\n"
+	printf "\t-y : Accept that the data collected will be sent to Kappa Data\n"
+}
+
+print_agreement() {
+	printf "This tool is provided by Kappa Data BV\n"
+	printf "By using it, you consent that the results of this scan are used to statistics\n"
 }
 
 # Handle Args
 
-while getopts 'l:b:d:fh' flag; do
+while getopts 'l:b:d:fhy' flag; do
 	case "${flag}" in
 		l) 	dnsList="${OPTARG}";;
 		b) 	blockpagesList="${OPTARG}";;
@@ -232,6 +239,7 @@ while getopts 'l:b:d:fh' flag; do
 		f)	timecheck=false ;;
 		h)	print_usage
 			exit 0 ;;
+		y)	accept_mail=true ;;
 		*) 	print_usage
 	   		exit 1 ;;
 	esac
@@ -242,6 +250,20 @@ if [ -z "$dnsList" ] || [ ! -f "$dnsList" ] \
 	print_usage
 	exit 1
 fi
+
+# Accept email condition
+if ! $accept_mail; then
+	print_agreement
+fi
+while ! $accept_mail; do
+	printf "Do you agree the condition above ? Y/N "
+	read response
+	case "$response" in
+		"y" | "Y") accept_mail=true;;
+		"n" | "N") exit 0;;
+		*);;
+	esac
+done
 
 # Init the blockpage list
 
