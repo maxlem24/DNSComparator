@@ -4,3 +4,4 @@ verbose/
 !blockpages.txt
 api/node_modules/
 .env
+*.pcap

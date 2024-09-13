@@ -216,7 +216,7 @@ send_email(){
 
 print_usage() {
 	printf "Usage: \n"
-	printf "\t-l filename : Set the list of DNS to test (required) \n"
+	printf "\t-l filename : Set the list of DNS provider to test (required) \n"
 	printf "\t-b filename : Set the list of the blockpages IP adresses (required) \n"
 	printf "\t-d filename : Set the list of domains to test. Default: valid.txt \n"
 	printf "\t-f : Force the use of the list of domains if it is been updated since more than 24 hours \n"
