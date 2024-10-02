@@ -1,6 +1,7 @@
 lists/
 verbose/
 *.txt
+*.csv
 !blockpages.txt
 api/node_modules/
 .env

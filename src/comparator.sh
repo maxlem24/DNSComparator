@@ -7,6 +7,7 @@ timecheck=true
 accept_mail=false
 
 VALID_LENGTH=0
+FINISHED_SCAN=0
 
 mkdir lists 2>>/dev/null
 
@@ -32,7 +33,7 @@ check_valid() {
 # Init lists
 
 init_list() {
-
+	local INIT_START=$(date +%s)
 	rm -f lists/*
 
 	curl -s "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" \
@@ -75,7 +76,9 @@ init_list() {
 
 	cat lists/sublist_valid* | sort > "$domains"
 
-	echo "Completed"
+	local INIT_END=$(date +%s)
+
+	echo "Completed in $(($INIT_END-INIT_START))s"
 	echo "Length of the final list: $(wc -l ${domains} | sed 's/ .*//')"
 }
 
@@ -111,22 +114,23 @@ thread_check_blocked() {
 
 	touch "lists/${dnsName}/timed_out_${id}.txt"
         touch "lists/${dnsName}/not_blocked_${id}.txt"
-
+	touch "lists/${dnsName}/time_${id}.txt"
 	while read host; do
+		local begin=$(date +%s%3N)
 		local data=$(dig @$dnsServer $host $dnsOptions +short)
+		local end=$(date +%s%3N)
 		local ip_address=$(echo "${data}" \
 			| grep -Eo "([0-9]{1,3}\.){3}[0-9]{1,3}" \
 			| tail -n1)
 		if [[ -z "$ip_address" ]] || is_a_blockpage "$ip_address" ;then
 			let thread_blocked++
-
 		elif [ "$ip_address" == "$dnsServer" ]; then
 			echo "${host}" >> "lists/${dnsName}/timed_out_${id}.txt"
-
 		else
 			echo "${ip_address} ${host}" >> "lists/${dnsName}/not_blocked_${id}.txt"
-
 		fi
+		local timequery=$(($end-$begin))
+		echo "${timequery}" >> "lists/${dnsName}/time_${id}.txt"
 	done < "lists/sub_valid${id}"
 
 	echo $thread_blocked >> "lists/${dnsName}/sub_valid_total"
@@ -170,20 +174,36 @@ checker() {
 
 	cat "lists/${dnsName}"/timed_out_*.txt | sort > "verbose/${dnsName}_timed_out.txt"
 	cat "lists/${dnsName}"/not_blocked_*.txt | sort > "verbose/${dnsName}_not_blocked.txt"
+	cat "lists/${dnsName}"/time_*.txt > "verbose/${dnsName}_time.txt"
 
 	local ENDTIME=$(date +%s)
 	local sum_blocked=0
+
+	local total_time=0
+	local max_time=0
+	local min_time=3600000
+
+	while read value; do
+                total_time=$(($total_time+$value))
+		if [ "$value" -gt "$max_time" ]; then
+			max_time=$value
+		fi
+		if [ "$value" -lt "$min_time" ]; then
+			min_time=$value
+		fi
+        done < "verbose/${dnsName}_time.txt"
 
 	while read value; do
 		sum_blocked=$(($sum_blocked+$value))
 	done < "lists/${dnsName}/sub_valid_total"
 
+	average_time=$(($total_time/$VALID_LENGTH))
+
 	rm -r "lists/${dnsName}"
 
 	percentage=$(echo "scale=2;100*${sum_blocked}/${VALID_LENGTH}" | bc -l)
 
-	echo "${sum_blocked}/${VALID_LENGTH} blocked by ${dnsName} (${percentage}%) $(($ENDTIME - $STARTTIME)) secs" >> results.txt
-	echo "${dnsName} finished in $(($ENDTIME - $STARTTIME)) secs"
+	echo "${dnsName};${sum_blocked};${VALID_LENGTH};${percentage}%;$(($ENDTIME - $STARTTIME));${average_time};${min_time};${max_time}" >> results.csv
 }
 
 # Send email
@@ -193,7 +213,7 @@ send_email(){
 	source .env
 	set +a
 
-	zip results -r -q results.txt verbose
+	zip results -r -q results.csv verbose
 	subject="Test results"
 	file="results.zip"
 
@@ -282,21 +302,18 @@ if [ -f $domains ];then
 	if $timecheck \
 	&& [ "$(($currentDate-$lastModif))" -gt "${day}" ];then
 
-		printf "Update of the domains list\n"
+		printf "Update of the domains list\r"
 		init_list
 
 	fi
 else
-	printf "The list of domains is empty, generation of a new list\n"
+	printf "The list of domains is empty, generation of a new list\r"
 	init_list
 fi
 
-# Init result.txt file
+# Init result.csv file
 
-result="results.txt"
-if [ -f $result ];then
-	rm $result
-fi
+echo "Name of the provider;Number of blocked domains;Number of tested domains;Ratio of blocked domains;Total Time (s);Average answer time (ms);Minimal answer time (ms);Maximal answer time (ms)" > results.csv
 
 VALID_LENGTH=$(wc -l "$domains" | sed 's/ .*//')
 DNS_THREADS=30
@@ -326,13 +343,19 @@ while read dns; do
 
 done < "${dnsList}"
 
+NB_DNS=${#PIDS[@]}
+
+printf "Scan running... ${FINISHED_SCAN}/${NB_DNS} finished\r"
+
 for pid in "${PIDS[@]}"; do
 	wait $pid
+	FINISHED_SCAN=$(($FINISHED_SCAN+1))
+	printf "Scan running... ${FINISHED_SCAN}/${NB_DNS} finished\r"
 done
 
 send_email
 
 rm  -f lists/sub*
 
-echo "Comparison finished, check the result in the 'results.txt' file"
+echo "Comparison finished, check the result in the 'results.csv' file"
 echo "The detailled results are in the 'verbose' folder"
