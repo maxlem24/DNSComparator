@@ -36,7 +36,7 @@ init_list() {
 	local INIT_START=$(date +%s)
 	rm -f lists/*
 
-	curl -s "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" \
+	curl -s "https://netapi.com/zf-api/f/compromised/domains/live/" \
 	| grep -i -v -e '^#' \
 	> lists/zonefiles_compromised.txt
 

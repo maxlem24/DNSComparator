@@ -5,7 +5,7 @@ mkdir lists 2>>/dev/null
 rm -f lists/*
 
 # Get lists
-wget --quiet "https://zonefiles.io/f/compromised/domains/live/compromised_domains_live.txt" -O - | grep -i -v -e '^#' > lists/zonefiles_compromised.txt
+wget --quiet "https://netapi.com/zf-api/f/compromised/domains/live/" -O - | grep -i -v -e '^#' > lists/zonefiles_compromised.txt
 wget --quiet "https://hole.cert.pl/domains/v2/domains.txt" -O lists/certpl_compromised.txt
 wget --quiet "https://v.firebog.net/hosts/Prigent-Malware.txt" -O - | grep -i -v -e '^#|^$' > lists/firebog_compromised.txt
 wget --quiet "https://urlhaus.abuse.ch/downloads/hostfile/" -O - | grep -i -v -e '^#' | sed "s/127.0.0.1\t//"> lists/abusesh_compromised.txt
